@@ -54,10 +54,44 @@ pub mod versioned {
 		crate::pallet::Pallet<T>,
 		<T as frame_system::Config>::DbWeight,
 	>;
+
+	/// On this version of the code migration to V7 will not succeed unless migration to v8 was done
+	/// before. We can change the order of migrations since they are independent of each other.
+	pub type V6ToV8<T> =  frame_support::migrations::VersionedMigration<
+		6,
+		8,
+		v8::UpgradeFromV6ToV8<T>,
+		crate::pallet::Pallet<T>,
+		<T as frame_system::Config>::DbWeight,
+	>;
+
 }
 
 pub mod v8 {
 	use super::*;
+
+	pub struct UpgradeFromV6ToV8<T>(sp_std::marker::PhantomData<T>);
+
+	impl<T: Config> OnRuntimeUpgrade for UpgradeFromV6ToV8<T> {
+		#[cfg(feature = "try-runtime")]
+		fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
+			Ok(Vec::new())
+		}
+
+		fn on_runtime_upgrade() -> Weight {
+			// We can change the order of migrations since they are independent of each other.
+			let w1 = VersionUncheckedMigrateV7ToV8::<T>::on_runtime_upgrade();
+			let w2 = v7::VersionUncheckedMigrateV6ToV7::<T>::on_runtime_upgrade();
+
+			w1.saturating_add(w2)
+		}
+
+		#[cfg(feature = "try-runtime")]
+		fn post_upgrade(_: Vec<u8>) -> Result<(), TryRuntimeError> {
+			VersionUncheckedMigrateV7ToV8::<T>::post_upgrade(Vec::new())?;
+			v7::VersionUncheckedMigrateV6ToV7::<T>::post_upgrade(Vec::new())
+		}
+	}
 
 	#[derive(Decode)]
 	pub struct OldCommission<T: Config> {
