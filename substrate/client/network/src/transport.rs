@@ -44,14 +44,13 @@ pub use libp2p::bandwidth::BandwidthSinks;
 /// high-level protocols combined, or to some generously high value if you are sure that a maximum
 /// size is enforced on all high-level protocols.
 ///
-/// Returns a `BandwidthSinks` object that allows querying the average bandwidth produced by all
-/// the connections spawned with this transport.
-pub fn build_transport(
+/// Returns a multiplexed and authenticated implementation of [`libp2p::Transport``].
+pub fn build_default_transport(
 	keypair: identity::Keypair,
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
+) -> Multiplexed<impl Transport<Output = (PeerId, impl StreamMuxer)>> {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)
@@ -95,12 +94,40 @@ pub fn build_transport(
 		yamux_config
 	};
 
-	let transport = transport
+	transport
 		.upgrade(upgrade::Version::V1Lazy)
 		.authenticate(authentication_config)
 		.multiplex(multiplexing_config)
 		.timeout(Duration::from_secs(20))
-		.boxed();
+}
 
-	transport.with_bandwidth_logging()
+/// Builds the transport that serves as a common ground for all connections.
+///
+/// If `memory_only` is true, then only communication within the same process are allowed. Only
+/// addresses with the format `/memory/...` are allowed.
+///
+/// `yamux_window_size` is the maximum size of the Yamux receive windows. `None` to leave the
+/// default (256kiB).
+///
+/// `yamux_maximum_buffer_size` is the maximum allowed size of the Yamux buffer. This should be
+/// set either to the maximum of all the maximum allowed sizes of messages frames of all
+/// high-level protocols combined, or to some generously high value if you are sure that a maximum
+/// size is enforced on all high-level protocols.
+///
+/// Returns a `BandwidthSinks` object that allows querying the average bandwidth produced by all
+/// the connections spawned with this transport.
+pub fn build_transport(
+	keypair: identity::Keypair,
+	memory_only: bool,
+	yamux_window_size: Option<u32>,
+	yamux_maximum_buffer_size: usize,
+) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
+	build_default_transport(
+		keypair,
+		memory_only,
+		yamux_window_size,
+		yamux_maximum_buffer_size
+	).
+		boxed().
+		with_bandwidth_logging()
 }
