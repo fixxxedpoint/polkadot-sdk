@@ -57,7 +57,7 @@ use crate::{
 use codec::DecodeAll;
 use either::Either;
 use futures::{channel::oneshot, prelude::*};
-use libp2p::{core::{transport::upgrade::Multiplexed, StreamMuxer}, Transport};
+use libp2p::{core::{transport::upgrade::Multiplexed, StreamMuxer, muxing::StreamMuxerBox}, Transport};
 #[allow(deprecated)]
 use libp2p::{
 	connection_limits::Exceeded,
@@ -161,9 +161,10 @@ where
 		Self::new_with_transport(params, |config| build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size))
 	}
 
-	pub fn new_with_transport(params: Params<B>, transport: impl FnOnce(
-		TransportConfig
-	) -> Multiplexed<impl Transport<Output = (PeerId, impl StreamMuxer)>>) {
+	pub fn new_with_transport(
+		params: Params<B>,
+		transport_builder: impl FnOnce(TransportConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>
+	) {
 		let FullNetworkConfiguration {
 			notification_protocols,
 			request_response_protocols,
@@ -274,15 +275,17 @@ where
 					.saturating_add(10)
 			};
 
-			let transport = transport(
+			transport_builder(
 				TransportConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
 					yamux_window_size: network_config.yamux_window_size,
 					yamux_maximum_buffer_size,
 				}
-			);
-			transport.boxed().with_bandwidth_logging()
+			)
+				.map(|(peerId, stream_muxer), _| (peerId, StreamMuxerBox::new(stream_muxer)))
+				.boxed()
+				.with_bandwidth_logging()
 		};
 
 		let (to_notifications, from_protocol_controllers) =
