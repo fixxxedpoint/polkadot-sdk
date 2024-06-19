@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport,
+	transport::{self, build_default_transport},
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -57,6 +57,7 @@ use crate::{
 use codec::DecodeAll;
 use either::Either;
 use futures::{channel::oneshot, prelude::*};
+use libp2p::{core::{transport::upgrade::Multiplexed, StreamMuxer}, Transport};
 #[allow(deprecated)]
 use libp2p::{
 	connection_limits::Exceeded,
@@ -139,6 +140,13 @@ pub struct NetworkService<B: BlockT + 'static, H: ExHashT> {
 	_block: PhantomData<B>,
 }
 
+pub struct TransportConfig {
+	pub keypair: identity::Keypair,
+	pub memory_only: bool,
+	pub yamux_window_size: Option<u32>,
+	pub yamux_maximum_buffer_size: usize,
+}
+
 impl<B, H> NetworkWorker<B, H>
 where
 	B: BlockT + 'static,
@@ -150,6 +158,12 @@ where
 	/// for the network processing to advance. From it, you can extract a `NetworkService` using
 	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
+		Self::new_with_transport(params, |config| build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size))
+	}
+
+	pub fn new_with_transport(params: Params<B>, transport: impl FnOnce(
+		TransportConfig
+	) -> Multiplexed<impl Transport<Output = (PeerId, impl StreamMuxer)>>) {
 		let FullNetworkConfiguration {
 			notification_protocols,
 			request_response_protocols,
@@ -260,12 +274,15 @@ where
 					.saturating_add(10)
 			};
 
-			transport::build_transport(
-				local_identity.clone(),
-				config_mem,
-				network_config.yamux_window_size,
-				yamux_maximum_buffer_size,
-			)
+			let transport = transport(
+				TransportConfig {
+					keypair: local_identity.clone(),
+					memory_only: config_mem,
+					yamux_window_size: network_config.yamux_window_size,
+					yamux_maximum_buffer_size,
+				}
+			);
+			transport.boxed().with_bandwidth_logging()
 		};
 
 		let (to_notifications, from_protocol_controllers) =
