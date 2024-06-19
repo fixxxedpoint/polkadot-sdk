@@ -926,7 +926,14 @@ where
 	};
 
 	let has_bootnodes = !network_params.network_config.network_config.boot_nodes.is_empty();
-	let network_mut = sc_network::NetworkWorker::new(network_params)?;
+	let network_mut = sc_network::NetworkWorker::new(network_params, |config| {
+		sc_network::transport::build_transport(
+			config.keypair,
+			config.memory_only,
+			config.muxer_window_size,
+			config.muxer_maximum_buffer_size,
+		)
+	})?;
 	let network = network_mut.service().clone();
 
 	let (tx_handler, tx_handler_controller) = transactions_handler_proto.build(
