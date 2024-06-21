@@ -141,10 +141,33 @@ pub struct NetworkService<B: BlockT + 'static, H: ExHashT> {
 }
 
 pub struct NetworkConfig {
-	pub keypair: identity::Keypair,
+	pub keypair: Keypair,
 	pub memory_only: bool,
 	pub yamux_window_size: Option<u32>,
 	pub yamux_maximum_buffer_size: usize,
+}
+
+pub trait TransportBuilder {
+	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>;
+}
+
+struct DefaultTransportBuilder {}
+
+impl DefaultTransportBuilder {
+	pub fn new() -> Self {
+		Self {}
+	}
+}
+
+impl TransportBuilder for DefaultTransportBuilder {
+    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
+		build_default_transport(
+			config.keypair,
+			config.memory_only,
+			config.yamux_window_size,
+			config.yamux_maximum_buffer_size
+		)
+    }
 }
 
 impl<B, H> NetworkWorker<B, H>
@@ -160,18 +183,13 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			|config| build_default_transport(
-				config.keypair,
-				config.memory_only,
-				config.yamux_window_size,
-				config.yamux_maximum_buffer_size
-			)
+			DefaultTransportBuilder::new(),
 		)
 	}
 
 	pub fn new_with_transport(
 		params: Params<B>,
-		transport_builder: impl FnOnce(NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>
+		transport_builder: impl TransportBuilder,
 	) {
 		let FullNetworkConfiguration {
 			notification_protocols,
@@ -283,7 +301,7 @@ where
 					.saturating_add(10)
 			};
 
-			transport_builder(
+			transport_builder.build_transport(
 				NetworkConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
