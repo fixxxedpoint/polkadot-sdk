@@ -148,7 +148,7 @@ pub struct NetworkConfig {
 }
 
 pub trait TransportBuilder {
-	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>;
+	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer + Send + 'static)>;
 }
 
 struct DefaultTransportBuilder {}
@@ -160,7 +160,7 @@ impl DefaultTransportBuilder {
 }
 
 impl TransportBuilder for DefaultTransportBuilder {
-    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
+    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer + Send + 'static)> {
 		build_default_transport(
 			config.keypair,
 			config.memory_only,
@@ -190,7 +190,7 @@ where
 	pub fn new_with_transport(
 		params: Params<B>,
 		transport_builder: impl TransportBuilder,
-	) {
+	) -> Result<Self, Error> {
 		let FullNetworkConfiguration {
 			notification_protocols,
 			request_response_protocols,
