@@ -31,7 +31,35 @@ use std::{sync::Arc, time::Duration};
 
 pub use libp2p::bandwidth::BandwidthSinks;
 
-use crate::TransportRequirements;
+// use crate::TransportRequirements;
+
+pub trait ConstrainedTransport: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static
+where
+	Self::Dial: Send + 'static,
+	Self::ListenerUpgrade: Send + 'static,
+	Self::Error: Send + Sync,
+	SM: StreamMuxer + Send + 'static,
+	SM::Substream: Send + 'static,
+	SM::Error: Send + Sync + 'static,
+{
+	type StreamMuxer;
+	type TransportType: Transport<Output = (PeerId, Self::StreamMuxer)>
+	where
+		TransportType::Dial: Send + 'static,
+		TransportType::ListenerUpgrade: Send + 'static,
+		TransportType::Error: Send + Sync;
+}
+
+// impl<T, SM> ConstrainedTransport<SM> for T
+// where
+// 	T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
+// 	T::Dial: Send + 'static,
+// 	T::ListenerUpgrade: Send + 'static,
+// 	T::Error: Send + Sync,
+// 	SM: StreamMuxer + Send + 'static,
+// 	SM::Substream: Send + 'static,
+// 	SM::Error: Send + Sync + 'static,
+// {}
 
 /// Builds the transport that serves as a common ground for all connections.
 ///
@@ -52,7 +80,7 @@ pub fn build_default_transport(
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> TransportRequirements<impl Transport<Output = (PeerId, impl StreamMuxer)>> {
+) -> impl ConstrainedTransport<impl StreamMuxer> {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)

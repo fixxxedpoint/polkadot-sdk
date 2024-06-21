@@ -51,7 +51,7 @@ use crate::{
 	},
 	transport::{self, build_default_transport},
 	types::ProtocolName,
-	ReputationChange, TransportRequirements,
+	ReputationChange,
 };
 
 use codec::DecodeAll;
@@ -147,31 +147,31 @@ pub struct NetworkConfig {
 	pub yamux_maximum_buffer_size: usize,
 }
 
-// pub type TransportRequirements<T> = T where T: Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static;
+// // pub type TransportRequirements<T> = T where T: Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static;
 
-pub trait TransportBuilder {
-	// TransportLocalImpl<T, SM>
-	fn build_transport(self, config: NetworkConfig) -> impl TransportRequirements<impl StreamMuxer>;
-}
+// pub trait TransportBuilder {
+// 	// TransportLocalImpl<T, SM>
+// 	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>;
+// }
 
-struct DefaultTransportBuilder {}
+// struct DefaultTransportBuilder {}
 
-impl DefaultTransportBuilder {
-	pub fn new() -> Self {
-		Self {}
-	}
-}
+// impl DefaultTransportBuilder {
+// 	pub fn new() -> Self {
+// 		Self {}
+// 	}
+// }
 
-impl TransportBuilder for DefaultTransportBuilder {
-    fn build_transport(self, config: NetworkConfig) -> impl TransportRequirements<impl StreamMuxer> {
-		build_default_transport(
-			config.keypair,
-			config.memory_only,
-			config.yamux_window_size,
-			config.yamux_maximum_buffer_size
-		)
-    }
-}
+// impl TransportBuilder for DefaultTransportBuilder {
+//     fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
+// 		build_default_transport(
+// 			config.keypair,
+// 			config.memory_only,
+// 			config.yamux_window_size,
+// 			config.yamux_maximum_buffer_size
+// 		)
+//     }
+// }
 
 impl<B, H> NetworkWorker<B, H>
 where
@@ -186,14 +186,24 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			DefaultTransportBuilder::new(),
+			move |config| build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size),
 		)
 	}
 
-	pub fn new_with_transport(
+	pub fn new_with_transport<TB, T, SM>(
 		params: Params<B>,
-		transport_builder: impl TransportBuilder,
-	) -> Result<Self, Error> {
+		transport_builder: TB,
+	) -> Result<Self, Error>
+	where
+		TB: FnOnce(NetworkConfig) -> T,
+	    T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
+	    T::Dial: Send + 'static,
+	    T::ListenerUpgrade: Send + 'static,
+	    T::Error: Send + Sync,
+	    SM: StreamMuxer + Send + 'static,
+	    SM::Substream: Send + 'static,
+	    SM::Error: Send + Sync + 'static,
+	{
 		let FullNetworkConfiguration {
 			notification_protocols,
 			request_response_protocols,
