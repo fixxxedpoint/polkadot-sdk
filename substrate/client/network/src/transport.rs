@@ -23,7 +23,7 @@ use libp2p::{
 	core::{
 		muxing::StreamMuxerBox,
 		transport::{Boxed, OptionalTransport},
-		upgrade,
+		upgrade, StreamMuxer,
 	},
 	dns, identity, noise, tcp, websocket, PeerId, Transport, TransportExt,
 };
@@ -50,7 +50,7 @@ pub fn build_default_transport(
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> Multiplexed<impl Transport<Output = (PeerId, impl StreamMuxer)>> {
+) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)
