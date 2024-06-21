@@ -148,7 +148,7 @@ pub struct NetworkConfig {
 }
 
 pub trait TransportBuilder {
-	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer + Send + 'static)>;
+	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>;
 }
 
 struct DefaultTransportBuilder {}
@@ -160,7 +160,7 @@ impl DefaultTransportBuilder {
 }
 
 impl TransportBuilder for DefaultTransportBuilder {
-    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer + Send + 'static)> {
+    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)> {
 		build_default_transport(
 			config.keypair,
 			config.memory_only,

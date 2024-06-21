@@ -50,7 +50,7 @@ pub fn build_default_transport(
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
+) -> impl Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)> {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)
