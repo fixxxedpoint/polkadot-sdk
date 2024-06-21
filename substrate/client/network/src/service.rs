@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport::{self, build_default_transport},
+	transport::{self, build_default_transport, ConstrainedTransport},
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -70,7 +70,7 @@ use libp2p::{
 		AddressScore, ConnectionError, ConnectionId, ConnectionLimits, DialError, Executor,
 		ListenError, NetworkBehaviour, Swarm, SwarmBuilder, SwarmEvent, THandlerErr,
 	},
-	Multiaddr, PeerId,
+	Multiaddr, PeerId, TransportExt
 };
 use log::{debug, error, info, trace, warn};
 use metrics::{Histogram, MetricSources, Metrics};
@@ -186,7 +186,12 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			move |config| build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size),
+			move |config| {
+				let transport = build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size);
+				// let transport: _ = transport.cast();
+				// transport
+				transport.cast()
+			},
 		)
 	}
 
@@ -314,7 +319,7 @@ where
 					.saturating_add(10)
 			};
 
-			transport_builder.build_transport(
+			transport_builder(
 				NetworkConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
