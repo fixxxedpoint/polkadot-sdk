@@ -140,7 +140,7 @@ pub struct NetworkService<B: BlockT + 'static, H: ExHashT> {
 	_block: PhantomData<B>,
 }
 
-pub struct TransportConfig {
+pub struct NetworkConfig {
 	pub keypair: identity::Keypair,
 	pub memory_only: bool,
 	pub yamux_window_size: Option<u32>,
@@ -158,12 +158,20 @@ where
 	/// for the network processing to advance. From it, you can extract a `NetworkService` using
 	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
-		Self::new_with_transport(params, |config| build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size))
+		Self::new_with_transport(
+			params,
+			|config| build_default_transport(
+				config.keypair,
+				config.memory_only,
+				config.yamux_window_size,
+				config.yamux_maximum_buffer_size
+			)
+		)
 	}
 
 	pub fn new_with_transport(
 		params: Params<B>,
-		transport_builder: impl FnOnce(TransportConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>
+		transport_builder: impl FnOnce(NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>
 	) {
 		let FullNetworkConfiguration {
 			notification_protocols,
@@ -276,7 +284,7 @@ where
 			};
 
 			transport_builder(
-				TransportConfig {
+				NetworkConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
 					yamux_window_size: network_config.yamux_window_size,
