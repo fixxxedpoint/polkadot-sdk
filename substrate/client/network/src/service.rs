@@ -51,7 +51,7 @@ use crate::{
 	},
 	transport::{self, build_default_transport},
 	types::ProtocolName,
-	ReputationChange,
+	ReputationChange, TransportRequirements,
 };
 
 use codec::DecodeAll;
@@ -147,10 +147,11 @@ pub struct NetworkConfig {
 	pub yamux_maximum_buffer_size: usize,
 }
 
-pub type TransportRequirements<T> = T where T: Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static;
+// pub type TransportRequirements<T> = T where T: Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static;
 
 pub trait TransportBuilder {
-	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static), Error = impl Send + Sync>;
+	// TransportLocalImpl<T, SM>
+	fn build_transport(self, config: NetworkConfig) -> impl TransportRequirements<impl StreamMuxer>;
 }
 
 struct DefaultTransportBuilder {}
@@ -162,7 +163,7 @@ impl DefaultTransportBuilder {
 }
 
 impl TransportBuilder for DefaultTransportBuilder {
-    fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)> {
+    fn build_transport(self, config: NetworkConfig) -> impl TransportRequirements<impl StreamMuxer> {
 		build_default_transport(
 			config.keypair,
 			config.memory_only,

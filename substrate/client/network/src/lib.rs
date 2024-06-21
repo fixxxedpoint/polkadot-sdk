@@ -283,6 +283,7 @@ pub use service::{
 	PublicKey,
 };
 pub use types::ProtocolName;
+use libp2p::{core::StreamMuxer, Transport};
 
 /// The maximum allowed number of established connections per peer.
 ///
@@ -295,3 +296,40 @@ const MAX_CONNECTIONS_PER_PEER: usize = 2;
 
 /// The maximum number of concurrent established connections that were incoming.
 const MAX_CONNECTIONS_ESTABLISHED_INCOMING: u32 = 10_000;
+
+// pub type Identity<T> = T;
+
+// pub type TransportRequirements<T, SM> = Identity<T> where T: Transport<Output = (PeerId, SM)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static, SM: StreamMuxer, SM::Substream: Send + 'static, SM::Error: Send + Sync + 'static;
+
+pub trait SecondOfPair {
+	type SecondType;
+}
+
+impl<B> SecondOfPair for (PeerId, B) {
+	type SecondType = B;
+}
+
+pub trait TransportRequirements: Transport + Sized + Send + Unpin + 'static
+where
+	Self: Transport + Sized + Send + Unpin + 'static,
+    T::Output: SecondOfPair,
+    T::Error: Send + Sync,
+    T::Dial: Send + 'static,
+    T::ListenerUpgrade: Send + 'static,
+<T::Output as SecondOfPair>::SecondType: StreamMuxer + Send + 'static,
+<<T::Output as SecondOfPair>::SecondType as StreamMuxer>::Substream: Send + 'static,
+<<T::Output as SecondOfPair>::SecondType as StreamMuxer>::Error: Send + Sync + 'static,
+{}
+// impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static
+
+impl<T> TransportRequirements for T
+where
+	T: Transport + Sized + Send + Unpin + 'static,
+    T::Output: SecondOfPair,
+    T::Error: Send + Sync,
+    T::Dial: Send + 'static,
+    T::ListenerUpgrade: Send + 'static,
+	<T::Output as SecondOfPair>::SecondType: StreamMuxer + Send + 'static,
+    <<T::Output as SecondOfPair>::SecondType as StreamMuxer>::Substream: Send + 'static,
+    <<T::Output as SecondOfPair>::SecondType as StreamMuxer>::Error: Send + Sync + 'static,
+{}
