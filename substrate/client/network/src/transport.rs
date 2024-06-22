@@ -22,25 +22,27 @@ use either::Either;
 use libp2p::{
 	core::{
 		muxing::StreamMuxerBox,
-		transport::{Boxed, OptionalTransport, OrTransport},
+		transport::{Boxed, OptionalTransport},
 		upgrade, StreamMuxer,
 	},
-	dns::{self, GenDnsConfig},
+	dns,
 	identity, noise,
-	tcp::{self, tokio::Tcp},
-	websocket::{self, WsConfig},
+	tcp,
+	websocket,
 	PeerId, Transport, TransportExt,
 };
-use std::{ops::SubAssign, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 pub use libp2p::bandwidth::BandwidthSinks;
 
+/// Allows to put more constraints on `impl Trait` implementation of the [`Transport`] trait.
+/// It is required by the [`NetworkWorker::new_with_transport`] method.
 pub trait ConstrainedTransport:
-    Transport<
+Transport<
 		Output = (PeerId, Self::StreamMuxerType),
-		Dial = Self::DialType,
-		ListenerUpgrade = Self::ListenerUpgradeType,
-		Error = Self::ErrorType,
+	Dial = Self::DialType,
+	ListenerUpgrade = Self::ListenerUpgradeType,
+	Error = Self::ErrorType,
 	>
 	+ Sized
 	+ Send
@@ -48,14 +50,20 @@ pub trait ConstrainedTransport:
 	+ 'static
 {
 
+	/// Additional constraints for the [`StreamMuxer::Substream`] type.
 	type SubstreamType: Send + 'static;
+	/// Additional constraints for the [`StreamMuxer::Error`] type.
 	type StreamMuxerErrorType: Send + Sync + 'static;
+	/// Additional constraints for the [`StreamMuxer`] type.
 	type StreamMuxerType: StreamMuxer<Substream = Self::SubstreamType, Error = Self::StreamMuxerErrorType>
 		+ Send
 		+ 'static;
 
+	/// Additional constraints for the [`Transport::Dial`] type.
 	type DialType: Send + 'static;
+	/// Additional constraints for the [`Transport::ListenerUpgrade`] type.
 	type ListenerUpgradeType: Send + 'static;
+	/// Additional constraints for the [`Transport::ErrorType`] type.
 	type ErrorType: Send + Sync;
 }
 
@@ -171,7 +179,7 @@ pub fn build_transport(
 	yamux_maximum_buffer_size: usize,
 ) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
 	build_default_transport(keypair, memory_only, yamux_window_size, yamux_maximum_buffer_size)
-		.map(|(peerId, stream_muxer), _| (peerId, StreamMuxerBox::new(stream_muxer)))
+		.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
 		.boxed()
 		.with_bandwidth_logging()
 }
