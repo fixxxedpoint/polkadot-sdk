@@ -55,6 +55,7 @@ Transport<
 	/// Additional constraints for the [`StreamMuxer::Error`] type.
 	type StreamMuxerErrorType: Send + Sync + 'static;
 	/// Additional constraints for the [`StreamMuxer`] type.
+	/// It is used as `Output` type in `Transport<Output = (PeerId, Self::StreamMuxerType)>`.
 	type StreamMuxerType: StreamMuxer<Substream = Self::SubstreamType, Error = Self::StreamMuxerErrorType>
 		+ Send
 		+ 'static;
