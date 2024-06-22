@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport::{self, build_default_transport, ConstrainedTransport},
+	transport::{self, build_default_transport},
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -57,7 +57,7 @@ use crate::{
 use codec::DecodeAll;
 use either::Either;
 use futures::{channel::oneshot, prelude::*};
-use libp2p::{core::{transport::upgrade::Multiplexed, StreamMuxer, muxing::StreamMuxerBox}, Transport};
+use libp2p::{core::{StreamMuxer, muxing::StreamMuxerBox}, Transport};
 #[allow(deprecated)]
 use libp2p::{
 	connection_limits::Exceeded,
@@ -140,38 +140,17 @@ pub struct NetworkService<B: BlockT + 'static, H: ExHashT> {
 	_block: PhantomData<B>,
 }
 
+/// Describes newtork configuration used for building an instance of [`Transport`] for the [`NetworkWorker`].
 pub struct NetworkConfig {
+	/// Our network identity.
 	pub keypair: Keypair,
+	/// Indicates whether created [`Transport`] should be only memory-based (without real network communication).
 	pub memory_only: bool,
-	pub yamux_window_size: Option<u32>,
-	pub yamux_maximum_buffer_size: usize,
+	/// Window size parameter for the muxer.
+	pub window_size: Option<u32>,
+	/// Buffer size for the muxer.
+	pub maximum_buffer_size: usize,
 }
-
-// // pub type TransportRequirements<T> = T where T: Transport<Output = (PeerId, impl StreamMuxer<Substream = impl Send + 'static, Error = impl Send + Sync + 'static> + Send + 'static)>, T::Error: Send + Sync, T: Sized + Send + Unpin + 'static, T::Dial: Send + 'static, T::ListenerUpgrade: Send + 'static;
-
-// pub trait TransportBuilder {
-// 	// TransportLocalImpl<T, SM>
-// 	fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)>;
-// }
-
-// struct DefaultTransportBuilder {}
-
-// impl DefaultTransportBuilder {
-// 	pub fn new() -> Self {
-// 		Self {}
-// 	}
-// }
-
-// impl TransportBuilder for DefaultTransportBuilder {
-//     fn build_transport(self, config: NetworkConfig) -> impl Transport<Output = (PeerId, impl StreamMuxer)> {
-// 		build_default_transport(
-// 			config.keypair,
-// 			config.memory_only,
-// 			config.yamux_window_size,
-// 			config.yamux_maximum_buffer_size
-// 		)
-//     }
-// }
 
 impl<B, H> NetworkWorker<B, H>
 where
@@ -187,17 +166,22 @@ where
 		Self::new_with_transport(
 			params,
 			move |config| {
-				build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size)
+				build_default_transport(config.keypair, config.memory_only, config.window_size, config.maximum_buffer_size)
 			},
 		)
 	}
 
+	/// Creates the network service. It allows to provide a custom implementation of the [`Transport`] for its underlying network transport,
+	/// i.e. a transport that is at minimum cryptographicaly authenticated and muxed.
+	///
+	/// Returns a `NetworkWorker` that implements `Future` and must be regularly polled in order
+	/// for the network processing to advance. From it, you can extract a `NetworkService` using
+	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
 	pub fn new_with_transport<SM, T>(
 		params: Params<B>,
 		transport_builder: impl FnOnce(NetworkConfig) -> T,
 	) -> Result<Self, Error>
 	where
-	// TODO move all of these to a specific struct type with single constructor
 	    SM: StreamMuxer + Send + 'static,
 	    SM::Substream: Send + 'static,
 	    SM::Error: Send + Sync + 'static,
@@ -321,11 +305,11 @@ where
 				NetworkConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
-					yamux_window_size: network_config.yamux_window_size,
-					yamux_maximum_buffer_size,
+					window_size: network_config.yamux_window_size,
+					maximum_buffer_size: yamux_maximum_buffer_size,
 				}
 			)
-				.map(|(peerId, stream_muxer), _| (peerId, StreamMuxerBox::new(stream_muxer)))
+				.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
 				.boxed()
 				.with_bandwidth_logging()
 		};

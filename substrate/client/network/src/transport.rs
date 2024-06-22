@@ -59,23 +59,24 @@ pub trait ConstrainedTransport:
 	type ErrorType: Send + Sync;
 }
 
-impl<T, SM> ConstrainedTransport for T
+impl<AnyTransport, AnyStreamMuxer> ConstrainedTransport for AnyTransport
 where
-	T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
-	T::Dial: Send + 'static,
-	T::ListenerUpgrade: Send + 'static,
-	T::Error: Send + Sync,
-	SM: StreamMuxer + Send + 'static,
-	SM::Substream: Send + 'static,
-	SM::Error: Send + Sync + 'static,
-{
-	type StreamMuxerType = SM;
-	type SubstreamType = SM::Substream;
-	type StreamMuxerErrorType = SM::Error;
+	AnyTransport: Transport<Output = (PeerId, AnyStreamMuxer)> + Sized + Send + Unpin + 'static,
+	AnyTransport::Dial: Send + 'static,
+	AnyTransport::ListenerUpgrade: Send + 'static,
+	AnyTransport::Error: Send + Sync,
 
-	type DialType = T::Dial;
-	type ListenerUpgradeType = T::ListenerUpgrade;
-	type ErrorType = T::Error;
+	AnyStreamMuxer: StreamMuxer + Send + 'static,
+	AnyStreamMuxer::Substream: Send + 'static,
+	AnyStreamMuxer::Error: Send + Sync + 'static,
+{
+	type StreamMuxerType = AnyStreamMuxer;
+	type SubstreamType = AnyStreamMuxer::Substream;
+	type StreamMuxerErrorType = AnyStreamMuxer::Error;
+
+	type DialType = AnyTransport::Dial;
+	type ListenerUpgradeType = AnyTransport::ListenerUpgrade;
+	type ErrorType = AnyTransport::Error;
 }
 
 /// Builds the transport that serves as a common ground for all connections.
