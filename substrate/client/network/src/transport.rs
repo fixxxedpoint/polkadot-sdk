@@ -35,81 +35,28 @@ use std::{ops::SubAssign, sync::Arc, time::Duration};
 
 pub use libp2p::bandwidth::BandwidthSinks;
 
-// use crate::TransportRequirements;
-
-pub trait SecondTypeInPair<T> {
-	type SecondInPair;
-}
-
-impl<A, B> SecondTypeInPair<(A, B)> for (A, B) {
-	type SecondInPair = B;
-}
-
-pub trait ConstrainedTransportNG
-	where
-	Self: Transport<Output = (PeerId, Self::StreamMuxerType)> + Sized + Send + Unpin + 'static,
-	Self::Dial: Send + 'static,
-	Self::ListenerUpgrade: Send + 'static,
-    Self::Error: Send + Sync,
-    <Self::StreamMuxerType as StreamMuxer>::Substream: Send + 'static,
-	<Self::StreamMuxerType as StreamMuxer>::Error: Send + Sync + 'static,
-{
-	type StreamMuxerType: StreamMuxer + Send + 'static;
-}
-
-impl<T, SM> ConstrainedTransportNG for T
-where
-	T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
-	T::Dial: Send + 'static,
-	T::ListenerUpgrade: Send + 'static,
-	T::Error: Send + Sync,
-	SM: StreamMuxer + Send + 'static,
-	SM::Substream: Send + 'static,
-	SM::Error: Send + Sync + 'static,
-{
-	type StreamMuxerType = SM;
-}
-
-pub trait ConstrainedTransport: Transport<
+pub trait ConstrainedTransport:
+    Transport<
 		Output = (PeerId, Self::StreamMuxerType),
-	Dial = Self::DialType,
-	ListenerUpgrade = Self::ListenerUpgradeType,
-	Error = Self::ErrorType,
-	> + Sized
+		Dial = Self::DialType,
+		ListenerUpgrade = Self::ListenerUpgradeType,
+		Error = Self::ErrorType,
+	>
+	+ Sized
 	+ Send
 	+ Unpin
-	+ 'static {
+	+ 'static
+{
+
 	type SubstreamType: Send + 'static;
 	type StreamMuxerErrorType: Send + Sync + 'static;
-
 	type StreamMuxerType: StreamMuxer<Substream = Self::SubstreamType, Error = Self::StreamMuxerErrorType>
 		+ Send
 		+ 'static;
 
-	// where
-	// StreamMuxerType::Substream: Send + 'static,
-	// StreamMuxerType::Error: Send + Sync + 'static;
-
 	type DialType: Send + 'static;
 	type ListenerUpgradeType: Send + 'static;
 	type ErrorType: Send + Sync;
-
-	// type TransportType: Transport<
-	// 		Output = (PeerId, Self::StreamMuxerType),
-	// 		Dial = Self::DialType,
-	// 		ListenerUpgrade = Self::ListenerUpgradeType,
-	// 		Error = Self::ErrorType,
-	// 	> + Sized
-	// 	+ Send
-	// 	+ Unpin
-	// 	+ 'static;
-
-	// where
-	// 	TransportType::Dial: Send + 'static,
-	// 	TransportType::ListenerUpgrade: Send + 'static,
-	// 	TransportType::Error: Send + Sync;
-
-	// fn cast(self) -> Self::TransportType;
 }
 
 impl<T, SM> ConstrainedTransport for T
@@ -122,34 +69,14 @@ where
 	SM::Substream: Send + 'static,
 	SM::Error: Send + Sync + 'static,
 {
+	type StreamMuxerType = SM;
 	type SubstreamType = SM::Substream;
 	type StreamMuxerErrorType = SM::Error;
 
 	type DialType = T::Dial;
 	type ListenerUpgradeType = T::ListenerUpgrade;
 	type ErrorType = T::Error;
-
-	type StreamMuxerType = SM;
-	// type TransportType = T;
-
-	// fn cast(self) -> Self::TransportType {
-	// 	self
-	// }
 }
-
-// pub trait TransportType {
-// 	type TransportType;
-
-// 	fn cast(self) -> Self::TransportType;
-// }
-
-// impl<T> TransportType for T {
-// 	type TransportType = T;
-
-// 	fn cast(self) -> Self::TransportType {
-// 		self
-// 	}
-// }
 
 /// Builds the transport that serves as a common ground for all connections.
 ///
@@ -170,7 +97,7 @@ pub fn build_default_transport(
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> impl ConstrainedTransport {
+) -> impl Transport<Output = (PeerId, impl StreamMuxer)> + ConstrainedTransport  {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)
@@ -243,6 +170,7 @@ pub fn build_transport(
 	yamux_maximum_buffer_size: usize,
 ) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
 	build_default_transport(keypair, memory_only, yamux_window_size, yamux_maximum_buffer_size)
+		.map(|(peerId, stream_muxer), _| (peerId, StreamMuxerBox::new(stream_muxer)))
 		.boxed()
 		.with_bandwidth_logging()
 }

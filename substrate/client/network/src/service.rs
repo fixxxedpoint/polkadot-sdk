@@ -192,19 +192,20 @@ where
 		)
 	}
 
-	pub fn new_with_transport<T, SM>(
+	pub fn new_with_transport<SM, T>(
 		params: Params<B>,
 		transport_builder: impl FnOnce(NetworkConfig) -> T,
 	) -> Result<Self, Error>
 	where
 	// TODO move all of these to a specific struct type with single constructor
+	    SM: StreamMuxer + Send + 'static,
+	    SM::Substream: Send + 'static,
+	    SM::Error: Send + Sync + 'static,
+
 	    T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
 	    T::Dial: Send + 'static,
 	    T::ListenerUpgrade: Send + 'static,
 	    T::Error: Send + Sync,
-	    SM: StreamMuxer + Send + 'static,
-	    SM::Substream: Send + 'static,
-	    SM::Error: Send + Sync + 'static,
 	{
 		let FullNetworkConfiguration {
 			notification_protocols,
