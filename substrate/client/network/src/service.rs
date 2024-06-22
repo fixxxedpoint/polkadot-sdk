@@ -187,20 +187,17 @@ where
 		Self::new_with_transport(
 			params,
 			move |config| {
-				let transport = build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size);
-				// let transport: _ = transport.cast();
-				// transport
-				transport.cast()
+				build_default_transport(config.keypair, config.memory_only, config.yamux_window_size, config.yamux_maximum_buffer_size)
 			},
 		)
 	}
 
-	pub fn new_with_transport<TB, T, SM>(
+	pub fn new_with_transport<T, SM>(
 		params: Params<B>,
-		transport_builder: TB,
+		transport_builder: impl FnOnce(NetworkConfig) -> T,
 	) -> Result<Self, Error>
 	where
-		TB: FnOnce(NetworkConfig) -> T,
+	// TODO move all of these to a specific struct type with single constructor
 	    T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
 	    T::Dial: Send + 'static,
 	    T::ListenerUpgrade: Send + 'static,
