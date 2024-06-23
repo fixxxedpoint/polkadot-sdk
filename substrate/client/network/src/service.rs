@@ -147,9 +147,9 @@ pub struct NetworkConfig {
 	/// Indicates whether created [`Transport`] should be only memory-based (without real network communication).
 	pub memory_only: bool,
 	/// Window size parameter for the muxer.
-	pub window_size: Option<u32>,
+	pub muxer_window_size: Option<u32>,
 	/// Buffer size for the muxer.
-	pub maximum_buffer_size: usize,
+	pub muxer_maximum_buffer_size: usize,
 }
 
 impl<B, H> NetworkWorker<B, H>
@@ -165,9 +165,13 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			move |config| {
-				build_default_transport(config.keypair, config.memory_only, config.window_size, config.maximum_buffer_size)
-			},
+			move |config|
+				build_default_transport(
+					config.keypair,
+					config.memory_only,
+					config.muxer_window_size,
+					config.muxer_maximum_buffer_size
+				)
 		)
 	}
 
@@ -305,8 +309,8 @@ where
 				NetworkConfig {
 					keypair: local_identity.clone(),
 					memory_only: config_mem,
-					window_size: network_config.yamux_window_size,
-					maximum_buffer_size: yamux_maximum_buffer_size,
+					muxer_window_size: network_config.yamux_window_size,
+					muxer_maximum_buffer_size: yamux_maximum_buffer_size,
 				}
 			)
 				.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
