@@ -182,14 +182,14 @@ where
 		transport_builder: impl FnOnce(NetworkConfig) -> T,
 	) -> Result<Self, Error>
 	where
-	    SM: StreamMuxer + Send + 'static,
-	    SM::Substream: Send + 'static,
-	    SM::Error: Send + Sync + 'static,
-
-	    T: Transport<Output = (PeerId, SM)> + Sized + Send + Unpin + 'static,
-	    T::Dial: Send + 'static,
-	    T::ListenerUpgrade: Send + 'static,
+	    T: Transport<Output = (PeerId, SM)> + Send + Unpin + 'static,
+	    T::Dial: Send,
+	    T::ListenerUpgrade: Send,
 	    T::Error: Send + Sync,
+
+	    SM: StreamMuxer + Send + 'static,
+	    SM::Substream: Send,
+	    SM::Error: Send + Sync,
 	{
 		let FullNetworkConfiguration {
 			notification_protocols,

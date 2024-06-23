@@ -35,59 +35,6 @@ use std::{sync::Arc, time::Duration};
 
 pub use libp2p::bandwidth::BandwidthSinks;
 
-/// Allows to put more constraints on `impl Trait` implementation of the [`Transport`] trait.
-/// It is required by the [`NetworkWorker::new_with_transport`] method.
-pub trait ConstrainedTransport:
-Transport<
-		Output = (PeerId, Self::StreamMuxerType),
-	Dial = Self::DialType,
-	ListenerUpgrade = Self::ListenerUpgradeType,
-	Error = Self::ErrorType,
-	>
-	+ Sized
-	+ Send
-	+ Unpin
-	+ 'static
-{
-
-	/// Additional constraints for the [`StreamMuxer::Substream`] type.
-	type SubstreamType: Send + 'static;
-	/// Additional constraints for the [`StreamMuxer::Error`] type.
-	type StreamMuxerErrorType: Send + Sync + 'static;
-	/// Additional constraints for the [`StreamMuxer`] type.
-	/// It is used as `Output` type in `Transport<Output = (PeerId, Self::StreamMuxerType)>`.
-	type StreamMuxerType: StreamMuxer<Substream = Self::SubstreamType, Error = Self::StreamMuxerErrorType>
-		+ Send
-		+ 'static;
-
-	/// Additional constraints for the [`Transport::Dial`] type.
-	type DialType: Send + 'static;
-	/// Additional constraints for the [`Transport::ListenerUpgrade`] type.
-	type ListenerUpgradeType: Send + 'static;
-	/// Additional constraints for the [`Transport::ErrorType`] type.
-	type ErrorType: Send + Sync;
-}
-
-impl<AnyTransport, AnyStreamMuxer> ConstrainedTransport for AnyTransport
-where
-	AnyTransport: Transport<Output = (PeerId, AnyStreamMuxer)> + Sized + Send + Unpin + 'static,
-	AnyTransport::Dial: Send + 'static,
-	AnyTransport::ListenerUpgrade: Send + 'static,
-	AnyTransport::Error: Send + Sync,
-
-	AnyStreamMuxer: StreamMuxer + Send + 'static,
-	AnyStreamMuxer::Substream: Send + 'static,
-	AnyStreamMuxer::Error: Send + Sync + 'static,
-{
-	type StreamMuxerType = AnyStreamMuxer;
-	type SubstreamType = AnyStreamMuxer::Substream;
-	type StreamMuxerErrorType = AnyStreamMuxer::Error;
-
-	type DialType = AnyTransport::Dial;
-	type ListenerUpgradeType = AnyTransport::ListenerUpgrade;
-	type ErrorType = AnyTransport::Error;
-}
-
 /// Builds the transport that serves as a common ground for all connections.
 ///
 /// If `memory_only` is true, then only communication within the same process are allowed. Only
@@ -107,7 +54,19 @@ pub fn build_default_transport(
 	memory_only: bool,
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
-) -> impl Transport<Output = (PeerId, impl StreamMuxer)> + ConstrainedTransport  {
+) -> impl Transport<
+		Output = (
+			PeerId,
+			impl StreamMuxer<
+					Substream = impl Send,
+				    Error = impl Send>
+		      + Send
+		),
+	    Dial = impl Send,
+	    ListenerUpgrade = impl Send,
+		Error = impl Send
+	 >
+	   + Send {
 	// Build the base layer of the transport.
 	let transport = if !memory_only {
 		// Main transport: DNS(TCP)
