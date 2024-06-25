@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport::{self, build_default_transport, NetworkConfig},
+	transport::{self, build_transport, NetworkConfig},
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -153,7 +153,7 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			build_default_transport
+			build_transport
 		)
 	}
 

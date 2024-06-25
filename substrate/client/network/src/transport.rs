@@ -22,8 +22,7 @@ use either::Either;
 use futures::{AsyncRead, AsyncWrite};
 use libp2p::{
 	core::{
-		muxing::StreamMuxerBox,
-		transport::{Boxed, OptionalTransport},
+		transport::OptionalTransport,
 		upgrade, StreamMuxer,
 	},
 	identity::Keypair,
@@ -31,13 +30,13 @@ use libp2p::{
 	identity, noise,
 	tcp,
 	websocket,
-	PeerId, Transport, TransportExt,
+	PeerId, Transport,
 };
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 pub use libp2p::bandwidth::BandwidthSinks;
 
-/// Describes network configuration used for building instances of [`Transport`].
+/// Describes network configuration used for building instances of [`libp2p::Transport`].
 pub struct NetworkConfig {
 	/// Our network identity.
 	pub keypair: Keypair,
@@ -49,7 +48,9 @@ pub struct NetworkConfig {
 	pub muxer_maximum_buffer_size: usize,
 }
 
-/// Builds default base layer transport, i.e. `WS + WSS` (with `DNS`) or `TCP + WS` (if `DNS` is not available).
+/// Creates default basic layer transport, i.e. `WS + WSS` (with `DNS`) or `TCP + WS` (when `DNS` is not available).
+/// It can be used as basis for building a custom implementation of authenticated and mutliplexed [`libp2p::Transport`]
+/// required by the [`NetworkWorker`].
 pub fn build_basic_transport(memory_only: bool) ->
 impl Transport<
 	Output = impl AsyncRead + AsyncWrite,
@@ -88,9 +89,9 @@ impl Transport<
 	}
 }
 
-/// Adds authentication and muxing to a given transport.
-/// For authentication it uses `noise` protocol.
-/// For muxing it uses `yamux`.
+/// Adds authentication and multiplexing to a given implementation of [`libp2p::Transport`].
+/// It uses the `noise` protocol for authentication.
+/// It uses the `yamux` library for connection multiplexing.
 pub fn add_authentication_and_muxing(
 	keypair: identity::Keypair,
 	yamux_window_size: Option<u32>,
@@ -152,7 +153,7 @@ impl Transport<
 /// size is enforced on all high-level protocols.
 ///
 /// Returns a multiplexed and authenticated implementation of [`libp2p::Transport``].
-pub fn build_default_transport(network_config: NetworkConfig) -> impl Transport<
+pub fn build_transport(network_config: NetworkConfig) -> impl Transport<
 		Output = (
 			PeerId,
 			impl StreamMuxer<
@@ -172,37 +173,4 @@ pub fn build_default_transport(network_config: NetworkConfig) -> impl Transport<
 		network_config.muxer_maximum_buffer_size,
 		basic_transport
 	)
-}
-
-/// Builds the transport that serves as a common ground for all connections.
-///
-/// If `memory_only` is true, then only communication within the same process are allowed. Only
-/// addresses with the format `/memory/...` are allowed.
-///
-/// `yamux_window_size` is the maximum size of the Yamux receive windows. `None` to leave the
-/// default (256kiB).
-///
-/// `yamux_maximum_buffer_size` is the maximum allowed size of the Yamux buffer. This should be
-/// set either to the maximum of all the maximum allowed sizes of messages frames of all
-/// high-level protocols combined, or to some generously high value if you are sure that a maximum
-/// size is enforced on all high-level protocols.
-///
-/// Returns a `BandwidthSinks` object that allows querying the average bandwidth produced by all
-/// the connections spawned with this transport.
-pub fn build_transport(
-	keypair: identity::Keypair,
-	memory_only: bool,
-	yamux_window_size: Option<u32>,
-	yamux_maximum_buffer_size: usize,
-) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
-	let network_config = NetworkConfig {
-		keypair,
-		memory_only,
-		muxer_window_size: yamux_window_size,
-		muxer_maximum_buffer_size: yamux_maximum_buffer_size
-	};
-	build_default_transport(network_config)
-		.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
-		.boxed()
-		.with_bandwidth_logging()
 }
