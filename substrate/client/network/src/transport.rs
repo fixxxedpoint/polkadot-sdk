@@ -153,7 +153,12 @@ impl Transport<
 /// size is enforced on all high-level protocols.
 ///
 /// Returns a multiplexed and authenticated implementation of [`libp2p::Transport``].
-pub fn build_transport(network_config: NetworkConfig) -> impl Transport<
+pub fn build_transport(
+	keypair: identity::Keypair,
+	memory_only: bool,
+	yamux_window_size: Option<u32>,
+	yamux_maximum_buffer_size: usize,
+) -> impl Transport<
 		Output = (
 			PeerId,
 			impl StreamMuxer<
@@ -166,11 +171,11 @@ pub fn build_transport(network_config: NetworkConfig) -> impl Transport<
 		Error = impl Send
 	 > + Send
 {
-	let basic_transport = build_basic_transport(network_config.memory_only);
+	let basic_transport = build_basic_transport(memory_only);
 	add_authentication_and_muxing(
-		network_config.keypair,
-		network_config.muxer_window_size,
-		network_config.muxer_maximum_buffer_size,
+		keypair,
+		yamux_window_size,
+		yamux_maximum_buffer_size,
 		basic_transport
 	)
 }

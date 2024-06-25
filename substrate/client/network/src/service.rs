@@ -153,7 +153,11 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			build_transport
+			|config| build_transport(
+				config.keypair,
+				config.memory_only,
+				config.muxer_window_size,
+				config.muxer_maximum_buffer_size)
 		)
 	}
 
