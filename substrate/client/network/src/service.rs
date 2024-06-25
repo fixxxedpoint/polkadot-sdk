@@ -161,8 +161,8 @@ where
 		)
 	}
 
-	/// Creates the network service. It allows to provide a custom implementation of the [`Transport`] for its underlying network transport,
-	/// i.e. a transport that is at minimum cryptographicaly authenticated and muxed.
+	/// Creates the network service. It allows to provide a custom implementation of the [`libp2p::Transport`] for its underlying network transport,
+	/// i.e. a transport that should at minimum provide authentication and multiplexing.
 	///
 	/// Returns a `NetworkWorker` that implements `Future` and must be regularly polled in order
 	/// for the network processing to advance. From it, you can extract a `NetworkService` using

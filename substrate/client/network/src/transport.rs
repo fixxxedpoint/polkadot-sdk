@@ -48,9 +48,8 @@ pub struct NetworkConfig {
 	pub muxer_maximum_buffer_size: usize,
 }
 
-/// Creates default basic layer transport, i.e. `WS + WSS` (with `DNS`) or `TCP + WS` (when `DNS` is not available).
-/// It can be used as basis for building a custom implementation of authenticated and mutliplexed [`libp2p::Transport`]
-/// required by the [`NetworkWorker`].
+/// Creates default base layer of network transport, i.e. a transport that allows connectivity for `WS + WSS` (with `DNS`) or `TCP + WS` (when `DNS` is not available).
+/// It can be used as basis for building a custom implementation of authenticated and mutliplexed [`libp2p::Transport`] that is required by the [`NetworkWorker`].
 pub fn build_basic_transport(memory_only: bool) ->
 impl Transport<
 	Output = impl AsyncRead + AsyncWrite,
@@ -90,8 +89,7 @@ impl Transport<
 }
 
 /// Adds authentication and multiplexing to a given implementation of [`libp2p::Transport`].
-/// It uses the `noise` protocol for authentication.
-/// It uses the `yamux` library for connection multiplexing.
+/// It uses the `noise` protocol for authentication and the `yamux` library for connection multiplexing.
 pub fn add_authentication_and_muxing(
 	keypair: identity::Keypair,
 	yamux_window_size: Option<u32>,
