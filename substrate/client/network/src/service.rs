@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport::{self, build_default_transport},
+	transport::{self, build_default_transport, NetworkConfig},
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -140,18 +140,6 @@ pub struct NetworkService<B: BlockT + 'static, H: ExHashT> {
 	_block: PhantomData<B>,
 }
 
-/// Describes newtork configuration used for building an instance of [`Transport`] for the [`NetworkWorker`].
-pub struct NetworkConfig {
-	/// Our network identity.
-	pub keypair: Keypair,
-	/// Indicates whether created [`Transport`] should be only memory-based (without real network communication).
-	pub memory_only: bool,
-	/// Window size parameter for the muxer.
-	pub muxer_window_size: Option<u32>,
-	/// Buffer size for the muxer.
-	pub muxer_maximum_buffer_size: usize,
-}
-
 impl<B, H> NetworkWorker<B, H>
 where
 	B: BlockT + 'static,
@@ -165,13 +153,7 @@ where
 	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		Self::new_with_transport(
 			params,
-			move |config|
-				build_default_transport(
-					config.keypair,
-					config.memory_only,
-					config.muxer_window_size,
-					config.muxer_maximum_buffer_size
-				)
+			build_default_transport
 		)
 	}
 

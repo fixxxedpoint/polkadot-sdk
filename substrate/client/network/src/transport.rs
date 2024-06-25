@@ -26,6 +26,7 @@ use libp2p::{
 		transport::{Boxed, OptionalTransport},
 		upgrade, StreamMuxer,
 	},
+	identity::Keypair,
 	dns,
 	identity, noise,
 	tcp,
@@ -35,6 +36,18 @@ use libp2p::{
 use std::{sync::Arc, time::Duration};
 
 pub use libp2p::bandwidth::BandwidthSinks;
+
+/// Describes network configuration used for building instances of [`Transport`].
+pub struct NetworkConfig {
+	/// Our network identity.
+	pub keypair: Keypair,
+	/// Indicates whether created [`Transport`] should be only memory-based.
+	pub memory_only: bool,
+	/// Window size of the muxer.
+	pub muxer_window_size: Option<u32>,
+	/// Buffer size of the muxer.
+	pub muxer_maximum_buffer_size: usize,
+}
 
 /// Builds default base layer transport, i.e. `WS + WSS` (with `DNS`) or `TCP + WS` (if `DNS` is not available).
 pub fn build_basic_transport(memory_only: bool) ->
@@ -139,12 +152,7 @@ impl Transport<
 /// size is enforced on all high-level protocols.
 ///
 /// Returns a multiplexed and authenticated implementation of [`libp2p::Transport``].
-pub fn build_default_transport(
-	keypair: identity::Keypair,
-	memory_only: bool,
-	yamux_window_size: Option<u32>,
-	yamux_maximum_buffer_size: usize,
-) -> impl Transport<
+pub fn build_default_transport(network_config: NetworkConfig) -> impl Transport<
 		Output = (
 			PeerId,
 			impl StreamMuxer<
@@ -157,9 +165,13 @@ pub fn build_default_transport(
 		Error = impl Send
 	 > + Send
 {
-	let transport = build_basic_transport(memory_only);
-	let authenticated_and_muxed_transport = add_authentication_and_muxing(keypair, yamux_window_size, yamux_maximum_buffer_size, transport);
-	authenticated_and_muxed_transport
+	let basic_transport = build_basic_transport(network_config.memory_only);
+	add_authentication_and_muxing(
+		network_config.keypair,
+		network_config.muxer_window_size,
+		network_config.muxer_maximum_buffer_size,
+		basic_transport
+	)
 }
 
 /// Builds the transport that serves as a common ground for all connections.
@@ -183,7 +195,13 @@ pub fn build_transport(
 	yamux_window_size: Option<u32>,
 	yamux_maximum_buffer_size: usize,
 ) -> (Boxed<(PeerId, StreamMuxerBox)>, Arc<BandwidthSinks>) {
-	build_default_transport(keypair, memory_only, yamux_window_size, yamux_maximum_buffer_size)
+	let network_config = NetworkConfig {
+		keypair,
+		memory_only,
+		muxer_window_size: yamux_window_size,
+		muxer_maximum_buffer_size: yamux_maximum_buffer_size
+	};
+	build_default_transport(network_config)
 		.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
 		.boxed()
 		.with_bandwidth_logging()
