@@ -49,7 +49,7 @@ use crate::{
 			NotificationSenderReady as NotificationSenderReadyT,
 		},
 	},
-	transport::{self, build_transport, NetworkConfig},
+	transport,
 	types::ProtocolName,
 	ReputationChange,
 };
@@ -69,11 +69,7 @@ use libp2p::{
 		AddressScore, ConnectionError, ConnectionId, ConnectionLimits, DialError, Executor,
 		ListenError, NetworkBehaviour, Swarm, SwarmBuilder, SwarmEvent, THandlerErr,
 	},
-	Multiaddr, PeerId, TransportExt,
-};
-use libp2p::{
-	core::{muxing::StreamMuxerBox, StreamMuxer},
-	Transport,
+	Multiaddr, PeerId,
 };
 use log::{debug, error, info, trace, warn};
 use metrics::{Histogram, MetricSources, Metrics};
@@ -148,28 +144,12 @@ where
 	B: BlockT + 'static,
 	H: ExHashT,
 {
-	/// Creates the network service. It allows to provide a custom implementation
-	/// of the [`libp2p::Transport`] for its underlying network transport,
-	/// i.e. a transport that should at minimum provide authentication and multiplexing.
-	/// Default implementation can be aquired by calling [`crate::transport::build_transport`].
+	/// Creates the network service.
 	///
 	/// Returns a `NetworkWorker` that implements `Future` and must be regularly polled in order
 	/// for the network processing to advance. From it, you can extract a `NetworkService` using
 	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
-	pub fn new<SM, T>(
-		params: Params<B>,
-		transport_builder: impl FnOnce(NetworkConfig) -> T,
-	) -> Result<Self, Error>
-	where
-		T: Transport<Output = (PeerId, SM)> + Send + Unpin + 'static,
-		T::Dial: Send,
-		T::ListenerUpgrade: Send,
-		T::Error: Send + Sync,
-
-		SM: StreamMuxer + Send + 'static,
-		SM::Substream: Send,
-		SM::Error: Send + Sync,
-	{
+	pub fn new(params: Params<B>) -> Result<Self, Error> {
 		let FullNetworkConfiguration {
 			notification_protocols,
 			request_response_protocols,
@@ -280,15 +260,12 @@ where
 					.saturating_add(10)
 			};
 
-			transport_builder(NetworkConfig {
-				keypair: local_identity.clone(),
-				memory_only: config_mem,
-				muxer_window_size: network_config.yamux_window_size,
-				muxer_maximum_buffer_size: yamux_maximum_buffer_size,
-			})
-			.map(|(peer_id, stream_muxer), _| (peer_id, StreamMuxerBox::new(stream_muxer)))
-			.boxed()
-			.with_bandwidth_logging()
+			transport::build_transport(
+				local_identity.clone(),
+				config_mem,
+				network_config.yamux_window_size,
+				yamux_maximum_buffer_size,
+			)
 		};
 
 		let (to_notifications, from_protocol_controllers) =
