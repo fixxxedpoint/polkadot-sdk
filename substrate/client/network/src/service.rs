@@ -148,6 +148,26 @@ where
 	B: BlockT + 'static,
 	H: ExHashT,
 {
+	/// Creates the network service.
+	///
+	/// Returns a `NetworkWorker` that implements `Future` and must be regularly polled in order
+	/// for the network processing to advance. From it, you can extract a `NetworkService` using
+	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
+	pub fn new(
+		params: Params<B>,
+	) -> Result<Self, Error>
+	{
+		Self::new_with_custom_transport(
+			params,
+			|config: NetworkConfig| build_transport(
+				config.keypair,
+				config.memory_only,
+				config.muxer_window_size,
+				config.muxer_maximum_buffer_size
+			)
+		)
+	}
+
 	/// Creates the network service. It allows to provide a custom implementation
 	/// of the [`libp2p::Transport`] for its underlying network transport,
 	/// i.e. a transport that should at minimum provide authentication and multiplexing.
@@ -156,7 +176,7 @@ where
 	/// Returns a `NetworkWorker` that implements `Future` and must be regularly polled in order
 	/// for the network processing to advance. From it, you can extract a `NetworkService` using
 	/// `worker.service()`. The `NetworkService` can be shared through the codebase.
-	pub fn new<SM, T>(
+	pub fn new_with_custom_transport<SM, T>(
 		params: Params<B>,
 		transport_builder: impl FnOnce(NetworkConfig) -> T,
 	) -> Result<Self, Error>
